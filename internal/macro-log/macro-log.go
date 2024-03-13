@@ -45,7 +45,7 @@ const uuidRoman string = "123123"
 
 func SetMacroLogRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/save-macro-log", saveMacroLog)
-	mux.HandleFunc("/api/get-macro-logs", getMacroLogs)
+	mux.HandleFunc("/api/get-macro-log", getMacroLogs)
 	mux.HandleFunc("/api/get-macro-log-by-id", getMacroLogId)
 	mux.HandleFunc("/api/delete-macro-log", deleteMacroLog)
 }
