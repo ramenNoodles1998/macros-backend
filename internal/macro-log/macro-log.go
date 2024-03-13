@@ -51,7 +51,7 @@ func SetMacroLogRoutes(mux *http.ServeMux) {
 }
 
 func saveMacroLog(w http.ResponseWriter, r *http.Request) {
-	var m Macro 
+	var m MacroLog
 
     err := json.NewDecoder(r.Body).Decode(&m)
     if err != nil {
@@ -60,10 +60,13 @@ func saveMacroLog(w http.ResponseWriter, r *http.Request) {
     }
 
 	var svc *dynamodb.DynamoDB = dynamoservice.DynamoService()
+	if len(m.Date) == 0 {
+		m.Date = time.Now().Format(yyyyMMddHHmmss);
+	}
 
 	var macroLog = MacroLogDB {
 		PartitionKey: uuidRoman,
-		SortKey: time.Now().Format(yyyyMMddHHmmss),
+		SortKey: m.Date,
 		Protein: m.Protein,
 		Carbs: m.Carbs,
 		Fat: m.Fat,
@@ -71,7 +74,7 @@ func saveMacroLog(w http.ResponseWriter, r *http.Request) {
 
 	returnMacroLog := MacroLog{
 		Id: uuidRoman,
-		Date: time.Now().Format(yyyyMMddHHmmss),
+		Date: m.Date,
 		Protein: m.Protein,
 		Carbs: m.Carbs,
 		Fat: m.Fat,
@@ -224,6 +227,14 @@ func deleteMacroLog(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+	returnMacroLog := MacroLog{
+		Id: uuidRoman,
+		Date: m.Date,
+		Protein: m.Protein,
+		Carbs: m.Carbs,
+		Fat: m.Fat,
+	}
+
 	var svc *dynamodb.DynamoDB = dynamoservice.DynamoService()
 
 	input := &dynamodb.DeleteItemInput{
@@ -242,4 +253,6 @@ func deleteMacroLog(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
 	}
+
+	json.NewEncoder(w).Encode(returnMacroLog)
 }
