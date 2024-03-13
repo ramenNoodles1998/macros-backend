@@ -24,12 +24,12 @@ type FoodItemDB struct {
 }
 
 type FoodItem struct {
-	Id      string
-	Name    string
-	Protein float64
-	Carbs   float64
-	Fat     float64
-	Serving string
+	Id      string  `json:"id"`
+	Name    string  `json:"name"`
+	Protein float64  `json:"protein"`
+	Carbs   float64  `json:"carbs"`
+	Fat     float64  `json:"fat"`
+	Serving string  `json:"serving"`
 }
 
 const tableName string = "dev-macros"
@@ -61,6 +61,15 @@ func saveFoodItem(w http.ResponseWriter, r *http.Request) {
 		Serving: fi.Serving,
 	}
 
+	returnFoodItem := FoodItem{
+		Id: fi.Id,
+		Name: fi.Name,
+		Protein: fi.Protein,
+		Carbs: fi.Carbs,
+		Fat: fi.Fat,
+		Serving: fi.Serving,
+	}
+
 	var svc *dynamodb.DynamoDB = dynamoservice.DynamoService()
 
 	av, err := dynamodbattribute.MarshalMap(foodItem)
@@ -80,6 +89,8 @@ func saveFoodItem(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("Got error calling PutItem: %s", err)
 		return
 	}
+
+	json.NewEncoder(w).Encode(returnFoodItem)
 }
 
 func getFoodItems(w http.ResponseWriter, r *http.Request) {
@@ -229,4 +240,6 @@ func deleteFoodItem(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
 	}
+
+	json.NewEncoder(w).Encode(fi)
 }

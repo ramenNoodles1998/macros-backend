@@ -23,11 +23,11 @@ type MacroLogDB struct {
 }
 
 type MacroLog struct {
-	Id string
-	Date string
-	Protein float64 
-	Carbs float64
-	Fat float64
+	Id string  `json:"id"`
+	Date string  `json:"date"`
+	Protein float64  `json:"protein"`
+	Carbs float64  `json:"carbs"`
+	Fat float64  `json:"fat"`
 }
 
 type Macro struct {
@@ -69,6 +69,14 @@ func saveMacroLog(w http.ResponseWriter, r *http.Request) {
 		Fat: m.Fat,
 	}
 
+	returnMacroLog := MacroLog{
+		Id: uuidRoman,
+		Date: time.Now().Format(yyyyMMddHHmmss),
+		Protein: m.Protein,
+		Carbs: m.Carbs,
+		Fat: m.Fat,
+	}
+
 	av, err := dynamodbattribute.MarshalMap(macroLog)
 	if err != nil {
 		fmt.Printf("Got error marshalling item: %s", err)
@@ -86,6 +94,8 @@ func saveMacroLog(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("Got error calling PutItem: %s", err)
 		return
 	}
+
+	json.NewEncoder(w).Encode(returnMacroLog)
 }
 
 func getMacroLogs(w http.ResponseWriter, r *http.Request) {
