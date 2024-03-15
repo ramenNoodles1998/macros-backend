@@ -34,7 +34,7 @@ type FoodItem struct {
 
 const tableName string = "dev-macros"
 const uuidRoman string = "123123"
-const nameSuffix = "NAME-"
+const namePrefix = "NAME-"
 
 func SetFoodItemRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/save-food-item", saveFoodItem)
@@ -54,7 +54,7 @@ func saveFoodItem(w http.ResponseWriter, r *http.Request) {
 
 	foodItem := FoodItemDB{
 		PartitionKey: fi.Id,
-		SortKey: nameSuffix + fi.Name,
+		SortKey: namePrefix + fi.Name,
 		Protein: fi.Protein,
 		Carbs: fi.Carbs,
 		Fat: fi.Fat,
@@ -141,7 +141,7 @@ func getFoodItems(w http.ResponseWriter, r *http.Request) {
 			Serving: fiDB.Serving,
 		}
 
-		fi.Name, _ = strings.CutPrefix(fiDB.SortKey, nameSuffix)
+		fi.Name, _ = strings.CutPrefix(fiDB.SortKey, namePrefix)
 		foodItems = append(foodItems, fi)
 		if err != nil {
 			panic(fmt.Sprintf("Failed to unmarshal Record, %v", err))
@@ -171,7 +171,7 @@ func getFoodItemId(w http.ResponseWriter, r *http.Request) {
 				ComparisonOperator: aws.String("EQ"),
 				AttributeValueList: []*dynamodb.AttributeValue {
 					{
-						S: aws.String(nameSuffix + id),
+						S: aws.String(namePrefix + id),
 					},
 				},
 			},
@@ -202,7 +202,7 @@ func getFoodItemId(w http.ResponseWriter, r *http.Request) {
 			Serving: fiDB.Serving,
 		}
 
-		fi.Name, _ = strings.CutPrefix(fiDB.SortKey, nameSuffix)
+		fi.Name, _ = strings.CutPrefix(fiDB.SortKey, namePrefix)
 		foodItems = append(foodItems, fi)
 		if err != nil {
 			panic(fmt.Sprintf("Failed to unmarshal Record, %v", err))
@@ -230,7 +230,7 @@ func deleteFoodItem(w http.ResponseWriter, r *http.Request) {
 				S: aws.String(fi.Id),
 			},
 			"SortKey": {
-				S: aws.String(nameSuffix + fi.Name),
+				S: aws.String(namePrefix + fi.Name),
 			},
 		},
 		TableName: aws.String(tableName),

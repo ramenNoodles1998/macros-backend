@@ -1,6 +1,6 @@
 module github.com/ramenNoodles1998/macros-backend
 
-go 1.22.0
+go 1.22
 
 require (
 	github.com/aws/aws-sdk-go v1.50.31

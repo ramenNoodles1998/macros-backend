@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -42,6 +43,7 @@ const (
 	yyyyMMddHHmmss = "20060102150405"
 )
 const uuidRoman string = "123123"
+const LOG_PREFIX string = "LOG-"
 
 func SetMacroLogRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/save-macro-log", saveMacroLog)
@@ -66,7 +68,7 @@ func saveMacroLog(w http.ResponseWriter, r *http.Request) {
 
 	var macroLog = MacroLogDB {
 		PartitionKey: uuidRoman,
-		SortKey: m.Date,
+		SortKey: LOG_PREFIX + m.Date,
 		Protein: m.Protein,
 		Carbs: m.Carbs,
 		Fat: m.Fat,
@@ -119,7 +121,7 @@ func getMacroLogs(w http.ResponseWriter, r *http.Request) {
 				ComparisonOperator: aws.String("BEGINS_WITH"),
 				AttributeValueList: []*dynamodb.AttributeValue {
 					{
-						S: aws.String(time.Now().Format(YYYYMMDD)),
+						S: aws.String(LOG_PREFIX + time.Now().Format(YYYYMMDD)),
 					},
 				},
 			},
@@ -149,6 +151,7 @@ func getMacroLogs(w http.ResponseWriter, r *http.Request) {
 			Fat: logDB.Fat,
 		}
 
+		log.Date, _ = strings.CutPrefix(log.Date, LOG_PREFIX)
 		logs = append(logs, log)
 		if err != nil {
 			panic(fmt.Sprintf("Failed to unmarshal Record, %v", err))
@@ -179,7 +182,7 @@ func getMacroLogId(w http.ResponseWriter, r *http.Request) {
 				ComparisonOperator: aws.String("EQ"),
 				AttributeValueList: []*dynamodb.AttributeValue {
 					{
-						S: aws.String(id),
+						S: aws.String(LOG_PREFIX + id),
 					},
 				},
 			},
@@ -237,13 +240,15 @@ func deleteMacroLog(w http.ResponseWriter, r *http.Request) {
 
 	var svc *dynamodb.DynamoDB = dynamoservice.DynamoService()
 
+	fmt.Println(m.Date)
+
 	input := &dynamodb.DeleteItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
 			"PartitionKey": {
 				S: aws.String(m.Id),
 			},
 			"SortKey": {
-				S: aws.String(m.Date),
+				S: aws.String(LOG_PREFIX + m.Date),
 			},
 		},
 		TableName: aws.String(tableName),
@@ -255,4 +260,66 @@ func deleteMacroLog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(returnMacroLog)
+}
+
+func getDailyMacroTotal(w http.ResponseWriter, r *http.Request) {
+	var svc *dynamodb.DynamoDB = dynamoservice.DynamoService()
+	//TODO: here we just add up logs
+	result, err := svc.Query(&dynamodb.QueryInput{
+		TableName: aws.String(tableName),
+		KeyConditions: map[string]*dynamodb.Condition{
+			"PartitionKey": {
+				ComparisonOperator: aws.String("EQ"),
+				AttributeValueList: []*dynamodb.AttributeValue {
+					{
+						S: aws.String(uuidRoman),
+					},
+				},
+			},
+			"SortKey": {
+				ComparisonOperator: aws.String("BEGINS_WITH"),
+				AttributeValueList: []*dynamodb.AttributeValue {
+					{
+						S: aws.String(LOG_PREFIX),
+					},
+				},
+			},
+			
+		},
+	})
+
+	if err != nil {
+		fmt.Printf("Got error calling GetItem: %s", err)
+		return
+	}
+	//TODO: return daily macro total and add up in for loop. Make sure if nothing is grabbed and auto set  id and date from len > 0
+	var dmt = DailyMacroTotal{ Id: uuidRoman, Date: time.Now().Format(YYYYMMDD), Protein: 0, Carbs: 0, Fat: 0 }
+	if result.Items == nil || len(result.Items) == 0 {
+		fmt.Printf("Could not find Daily Macro Total")
+		json.NewEncoder(w).Encode()
+		return
+	}
+	dmt[Date] = result.Items[0].Date
+    
+
+	for _, item := range result.Items {
+		err = dynamodbattribute.UnmarshalMap(item, &dmtdb)
+		var dmt = DailyMacroTotal{
+			Id: dmtdb.PartitionKey,
+			Date: dmtdb.SortKey,
+			Protein: dmtdb.Protein,
+			Carbs: dmtdb.Carbs,
+			Fat: dmtdb.Fat,
+		}
+
+		dmt.Date, _ = strings.CutPrefix(dmt.Date, dailyMacroTotalPrefix)
+		dmts = append(dmts, dmt)
+		if err != nil {
+			panic(fmt.Sprintf("Failed to unmarshal Record, %v", err))
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(dmts[0])
+
 }
