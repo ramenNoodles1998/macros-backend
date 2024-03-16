@@ -1,23 +1,30 @@
-# Specifies a parent image
-FROM golang:1.22.1-alpine3.19
- 
-# Creates an src directory to hold your app’s source code
-WORKDIR /src
- 
-# Copies everything from your root directory into /app
-COPY . .
- 
-# Installs Go dependencies
+FROM golang:1.22.1-alpine3.19 as builder
+
+RUN apk add bash
+
+RUN apk add --no-cache openssh-client ansible git
+
+RUN mkdir /workspace
+WORKDIR /workspace
+
+COPY go.mod ./
+COPY go.sum ./
+
 RUN go mod download
- 
-# Builds your app with optional configuration
-RUN go -C ./cmd/macros-backend build 
 
- 
-# Tells Docker which network port your container listens on
-EXPOSE 3030
+COPY . ./
 
-RUN cd ./cmd/macros-backend/
- 
-# Specifies the executable command that runs when the container starts
-CMD [ “macros-backend” ]
+RUN go build cmd/macros-backend/main.go
+
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates
+WORKDIR /root/
+
+COPY --from=builder /workspace .
+
+ARG DEFAULT_PORT=3030
+ENV PORT $DEFAULT_PORT
+
+EXPOSE $PORT
+
+CMD ["./main"]

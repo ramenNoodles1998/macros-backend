@@ -50,6 +50,7 @@ func SetMacroLogRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/get-macro-logs", getMacroLogs)
 	mux.HandleFunc("/api/get-macro-log-by-id", getMacroLogId)
 	mux.HandleFunc("/api/delete-macro-log", deleteMacroLog)
+	mux.HandleFunc("/api/get-daily-macro-total", getDailyMacroTotal)
 }
 
 func saveMacroLog(w http.ResponseWriter, r *http.Request) {
@@ -129,12 +130,12 @@ func getMacroLogs(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		fmt.Printf("Got error calling GetItem: %s", err)
+		fmt.Printf("GOT ERROR CALLING GetItem: %s\n", err)
 		return
 	}
 
 	if result.Items == nil || len(result.Items) == 0 {
-		fmt.Printf("Could not find Logs")
+		fmt.Printf("NO LOGS\n")
 		return
 	}
     
@@ -154,7 +155,7 @@ func getMacroLogs(w http.ResponseWriter, r *http.Request) {
 		log.Date, _ = strings.CutPrefix(log.Date, LOG_PREFIX)
 		logs = append(logs, log)
 		if err != nil {
-			panic(fmt.Sprintf("Failed to unmarshal Record, %v", err))
+			panic(fmt.Sprintf("FAILED TO UNMARSHAL RECORD, %v", err))
 		}
 	}
 
@@ -190,7 +191,7 @@ func getMacroLogId(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		fmt.Printf("Got error calling GetItem: %s", err)
+		fmt.Printf("GOT ERROR CALLING GET_ITEM: %s", err)
 		return
 	}
 
@@ -213,7 +214,7 @@ func getMacroLogId(w http.ResponseWriter, r *http.Request) {
 
 		logs = append(logs, log)
 		if err != nil {
-			panic(fmt.Sprintf("Failed to unmarshal Record, %v", err))
+			panic(fmt.Sprintf("FAILED TO UNMARSHAL RECORD, %v\n", err))
 		}
 	}
 
@@ -264,7 +265,6 @@ func deleteMacroLog(w http.ResponseWriter, r *http.Request) {
 
 func getDailyMacroTotal(w http.ResponseWriter, r *http.Request) {
 	var svc *dynamodb.DynamoDB = dynamoservice.DynamoService()
-	//TODO: here we just add up logs
 	result, err := svc.Query(&dynamodb.QueryInput{
 		TableName: aws.String(tableName),
 		KeyConditions: map[string]*dynamodb.Condition{
@@ -293,33 +293,29 @@ func getDailyMacroTotal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	//TODO: return daily macro total and add up in for loop. Make sure if nothing is grabbed and auto set  id and date from len > 0
-	var dmt = DailyMacroTotal{ Id: uuidRoman, Date: time.Now().Format(YYYYMMDD), Protein: 0, Carbs: 0, Fat: 0 }
+	var ml = MacroLog{ Id: uuidRoman, Date: time.Now().Format(YYYYMMDD), Protein: 0, Carbs: 0, Fat: 0 }
 	if result.Items == nil || len(result.Items) == 0 {
 		fmt.Printf("Could not find Daily Macro Total")
-		json.NewEncoder(w).Encode()
+		json.NewEncoder(w).Encode(ml)
 		return
 	}
-	dmt[Date] = result.Items[0].Date
-    
 
 	for _, item := range result.Items {
-		err = dynamodbattribute.UnmarshalMap(item, &dmtdb)
-		var dmt = DailyMacroTotal{
-			Id: dmtdb.PartitionKey,
-			Date: dmtdb.SortKey,
-			Protein: dmtdb.Protein,
-			Carbs: dmtdb.Carbs,
-			Fat: dmtdb.Fat,
+		mldb := MacroLogDB{}
+		err = dynamodbattribute.UnmarshalMap(item, &mldb)
+		ml = MacroLog{
+			Id: mldb.PartitionKey,
+			Date: ml.Date,
+			Protein: ml.Protein + mldb.Protein,
+			Carbs: ml.Carbs + mldb.Carbs,
+			Fat: ml.Fat + mldb.Fat,
 		}
-
-		dmt.Date, _ = strings.CutPrefix(dmt.Date, dailyMacroTotalPrefix)
-		dmts = append(dmts, dmt)
+		ml.Date, _ = strings.CutPrefix(ml.Date, LOG_PREFIX)
 		if err != nil {
 			panic(fmt.Sprintf("Failed to unmarshal Record, %v", err))
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(dmts[0])
-
+	json.NewEncoder(w).Encode(ml)
 }
